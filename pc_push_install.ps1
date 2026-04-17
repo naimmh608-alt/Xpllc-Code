@@ -1,6 +1,6 @@
 # =========================================================================
 #  Xpllc-Code God-Mode - One-Click PC Installer
-#  Groq + OpenRouter Multi-Provider Edition
+#  Groq + OpenRouter + Modal Multi-Provider Edition
 #  Run on Windows PC with phone connected via USB.
 #  Prerequisite: USB Debugging enabled on the phone.
 # =========================================================================
@@ -8,7 +8,7 @@
 Write-Host ""
 Write-Host "  ======================================================" -ForegroundColor Cyan
 Write-Host "    Xpllc-Code God-Mode - PC Push Installer" -ForegroundColor Cyan
-Write-Host "    Groq + OpenRouter Multi-Provider Edition" -ForegroundColor Cyan
+Write-Host "    Groq + OpenRouter + Modal Multi-Provider Edition" -ForegroundColor Cyan
 Write-Host "    Fully automated. Zero manual steps." -ForegroundColor Cyan
 Write-Host "  ======================================================" -ForegroundColor Cyan
 Write-Host ""

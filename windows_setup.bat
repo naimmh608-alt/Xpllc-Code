@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 echo =================================================
 echo   [>>] Xpllc-Code Windows Auto-Installer
-echo   Groq + OpenRouter Multi-Provider Edition
+echo   Groq + OpenRouter + Modal Multi-Provider Edition
 echo =================================================
 echo.
 echo   Let's get your settings first!
@@ -14,14 +14,26 @@ echo.
 echo   Select API Provider:
 echo   1) Groq        (Ultra-fast inference, groq.com)
 echo   2) OpenRouter   (Multi-model access, openrouter.ai)
+echo   3) Modal        (Serverless GPU inference, modal.com)
 echo.
-set /p PROVIDER_CHOICE="Choose [1-2] (Default: 1 - Groq): "
+set /p PROVIDER_CHOICE="Choose [1-3] (Default: 1 - Groq): "
 if "%PROVIDER_CHOICE%"=="" set PROVIDER_CHOICE=1
 
 if "%PROVIDER_CHOICE%"=="1" (
     set PROVIDER=groq
     set API_BASE=https://api.groq.com/openai/v1
     echo   [OK] Provider: Groq
+) else if "%PROVIDER_CHOICE%"=="3" (
+    set PROVIDER=modal
+    echo   [OK] Provider: Modal
+    echo.
+    echo   Modal serves OpenAI-compatible APIs from your deployed apps.
+    echo   URL format: https://your-workspace--app-name-serve.modal.run
+    echo   Deploy first: modal deploy your_app.py
+    echo   Docs: https://modal.com/docs/examples/vllm_inference
+    echo.
+    set /p MODAL_ENDPOINT="Enter your Modal endpoint URL: "
+    set API_BASE=!MODAL_ENDPOINT!/v1
 ) else (
     set PROVIDER=openrouter
     set API_BASE=https://openrouter.ai/api/v1
@@ -33,6 +45,12 @@ echo.
 if "!PROVIDER!"=="groq" (
     echo   Get your free key at: https://console.groq.com/keys
     set /p API_KEY="Enter your Groq API Key (gsk_...): "
+) else if "!PROVIDER!"=="modal" (
+    echo   Modal uses token-based auth. Pass any key or press Enter for 'no-key'.
+    echo   Setup tokens: modal token set --token-id ^<id^> --token-secret ^<secret^>
+    echo   Get tokens at: https://modal.com/settings
+    set /p API_KEY="Enter API Key (or press Enter for no-key): "
+    if "!API_KEY!"=="" set API_KEY=no-key
 ) else (
     set /p API_KEY="Enter your OpenRouter API Key (sk-or-...): "
 )
@@ -71,6 +89,32 @@ if "!PROVIDER!"=="groq" (
     if "!MODEL_CHOICE!"=="9" (
         echo.
         echo   Enter any model ID from https://console.groq.com/docs/models
+        set /p MODEL_NAME="Enter custom model ID: "
+    )
+) else if "!PROVIDER!"=="modal" (
+    echo   Available Modal Models (deploy these via vLLM/SGLang^):
+    echo   -----------------------------------------
+    echo   1^) google/gemma-4-26B-A4B-it             (Fast MoE, vision^)
+    echo   2^) meta-llama/Llama-3.3-70B-Instruct      (Strong general purpose^)
+    echo   3^) meta-llama/Llama-3.1-8B-Instruct       (Fast and lightweight^)
+    echo   4^) mistralai/Mistral-Small-24B-Instruct-2501 (Efficient^)
+    echo   5^) Qwen/Qwen3-32B                         (Multilingual^)
+    echo   6^) openai/gpt-oss-120b                     (Large OSS model^)
+    echo   -----------------------------------------
+    echo   7^) Custom Model ID
+    echo.
+    set /p MODEL_CHOICE="Choose a number (Default: 1 - gemma-4^): "
+    if "!MODEL_CHOICE!"=="" set MODEL_CHOICE=1
+
+    if "!MODEL_CHOICE!"=="1" set MODEL_NAME=google/gemma-4-26B-A4B-it
+    if "!MODEL_CHOICE!"=="2" set MODEL_NAME=meta-llama/Llama-3.3-70B-Instruct
+    if "!MODEL_CHOICE!"=="3" set MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
+    if "!MODEL_CHOICE!"=="4" set MODEL_NAME=mistralai/Mistral-Small-24B-Instruct-2501
+    if "!MODEL_CHOICE!"=="5" set MODEL_NAME=Qwen/Qwen3-32B
+    if "!MODEL_CHOICE!"=="6" set MODEL_NAME=openai/gpt-oss-120b
+    if "!MODEL_CHOICE!"=="7" (
+        echo.
+        echo   Enter the HuggingFace model ID you deployed on Modal
         set /p MODEL_NAME="Enter custom model ID: "
     )
 ) else (

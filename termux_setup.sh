@@ -1,8 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ─────────────────────────────────────────────
-#  Xpllc-Code Termux Installer v3.0
-#  Groq + OpenRouter Multi-Provider Edition
+#  Xpllc-Code Termux Installer v4.0
+#  Groq + OpenRouter + Modal Multi-Provider Edition
 #  github.com/naimmh608-alt/Xpllc-Code
 # ─────────────────────────────────────────────
 
@@ -23,9 +23,11 @@ CONFIG_DIR="$HOME/.openclaude"
 CONFIG_FILE="$CONFIG_DIR/config"
 OFFICIAL_REPO="https://packages.termux.dev/apt/termux-main"
 
-# ── Groq Configuration ──────────────────────
+# ── Provider API Bases ──────────────────────
 GROQ_API_BASE="https://api.groq.com/openai/v1"
 OPENROUTER_API_BASE="https://openrouter.ai/api/v1"
+# Modal endpoints are user-deployed, format: https://<workspace>--<app-name>-serve.modal.run/v1
+MODAL_API_BASE=""
 
 # ── Mirror Auto-Fix ─────────────────────────
 
@@ -57,9 +59,9 @@ line() { echo -e "${DIM}──────────────────�
 header() {
     clear
     echo ""
-    echo -e "  ${CYN}${B}Xpllc-Code${R} ${DIM}v3.0${R}"
+    echo -e "  ${CYN}${B}Xpllc-Code${R} ${DIM}v4.0${R}"
     echo -e "  ${DIM}Android Supercharged Edition${R}"
-    echo -e "  ${DIM}Groq + OpenRouter Multi-Provider${R}"
+    echo -e "  ${DIM}Groq + OpenRouter + Modal Multi-Provider${R}"
     line
 }
 
@@ -114,9 +116,10 @@ select_provider() {
     line
     echo -e "  ${CYN}1)${R} ${GRN}Groq${R}        ${DIM}(Ultra-fast inference, groq.com)${R}"
     echo -e "  ${CYN}2)${R} ${BLU}OpenRouter${R}   ${DIM}(Multi-model access, openrouter.ai)${R}"
+    echo -e "  ${CYN}3)${R} ${MAG}Modal${R}        ${DIM}(Serverless GPU inference, modal.com)${R}"
     line
     echo ""
-    read -p "  Pick [1-2] (default 1 - Groq): " provider_choice
+    read -p "  Pick [1-3] (default 1 - Groq): " provider_choice
     echo ""
 
     [ -z "$provider_choice" ] && provider_choice=1
@@ -131,6 +134,10 @@ select_provider() {
             PROVIDER="openrouter"
             API_BASE="$OPENROUTER_API_BASE"
             ok "Provider: ${BLU}${B}OpenRouter${R} (Multi-model gateway)"
+            ;;
+        3)
+            PROVIDER="modal"
+            ok "Provider: ${MAG}${B}Modal${R} (Serverless GPU inference)"
             ;;
         *)
             warn "Invalid choice. Defaulting to Groq."
@@ -202,11 +209,30 @@ fetch_openrouter_models() {
     fi
 }
 
+# ── Fetch Modal Models ─────────────────────
+
+fetch_modal_models() {
+    echo ""
+    info "Modal uses your own deployed endpoints (vLLM/SGLang on GPU)."
+    info "Models depend on what you've deployed to your Modal workspace."
+    echo ""
+    MODELS=(
+        "google/gemma-4-26B-A4B-it"
+        "meta-llama/Llama-3.3-70B-Instruct"
+        "meta-llama/Llama-3.1-8B-Instruct"
+        "mistralai/Mistral-Small-24B-Instruct-2501"
+        "Qwen/Qwen3-32B"
+        "openai/gpt-oss-120b"
+    )
+}
+
 # ── Fetch Models (Dispatcher) ───────────────
 
 fetch_models() {
     if [ "$PROVIDER" == "groq" ]; then
         fetch_groq_models
+    elif [ "$PROVIDER" == "modal" ]; then
+        fetch_modal_models
     else
         fetch_openrouter_models
     fi
@@ -286,6 +312,8 @@ select_model() {
     # Show recommended default
     if [ "$PROVIDER" == "groq" ]; then
         echo -e "  ${DIM}Recommended: llama-3.3-70b-versatile (best balance)${R}"
+    elif [ "$PROVIDER" == "modal" ]; then
+        echo -e "  ${DIM}Recommended: google/gemma-4-26B-A4B-it (fast MoE)${R}"
     fi
 
     read -p "  Pick [1-$c] (default 1): " choice
@@ -305,6 +333,15 @@ select_model() {
             echo -e "  ${DIM}  . openai/gpt-oss-120b${R}"
             echo -e "  ${DIM}  . meta-llama/llama-4-scout-17b-16e-instruct${R}"
             echo -e "  ${DIM}  . qwen/qwen3-32b${R}"
+        elif [ "$PROVIDER" == "modal" ]; then
+            warn "${B}Custom model:${R}"
+            echo -e "  ${DIM}Enter the HuggingFace model ID you deployed on Modal${R}"
+            echo ""
+            echo -e "  ${DIM}Examples:${R}"
+            echo -e "  ${DIM}  . google/gemma-4-26B-A4B-it${R}"
+            echo -e "  ${DIM}  . meta-llama/Llama-3.3-70B-Instruct${R}"
+            echo -e "  ${DIM}  . mistralai/Mistral-Small-24B-Instruct-2501${R}"
+            echo -e "  ${DIM}  . Qwen/Qwen3-32B${R}"
         else
             warn "${B}Paid model warning:${R}"
             echo -e "  ${DIM}Custom models charge your OpenRouter account${R}"
@@ -339,13 +376,22 @@ prompt_api_key() {
         echo -e "  ${DIM}Get your free key at: ${B}https://console.groq.com/keys${R}"
         echo ""
         read -p "  Enter Groq API Key (gsk_...): " API_KEY
+    elif [ "$PROVIDER" == "modal" ]; then
+        echo -e "  ${DIM}Modal uses token-based auth via MODAL_TOKEN_ID + MODAL_TOKEN_SECRET${R}"
+        echo -e "  ${DIM}For OpenAI-compatible endpoints, pass any string as the API key${R}"
+        echo -e "  ${DIM}(or your Modal token if your deployment requires auth).${R}"
+        echo -e "  ${DIM}Setup tokens: ${B}modal token set --token-id <id> --token-secret <secret>${R}"
+        echo -e "  ${DIM}Get tokens at: ${B}https://modal.com/settings${R}"
+        echo ""
+        read -p "  Enter API Key (or press Enter for 'no-key'): " API_KEY
+        [ -z "$API_KEY" ] && API_KEY="no-key"
     else
         echo -e "  ${DIM}Get your key at: ${B}https://openrouter.ai/${R}"
         echo ""
         read -p "  Enter OpenRouter API Key (sk-or-...): " API_KEY
     fi
     echo ""
-    if [ -z "$API_KEY" ]; then
+    if [ -z "$API_KEY" ] && [ "$PROVIDER" != "modal" ]; then
         err "API Key cannot be empty!"
         prompt_api_key
         return
@@ -359,6 +405,59 @@ prompt_api_key() {
     fi
 
     ok "Key: ${DIM}$(mask_key "$API_KEY")${R}"
+}
+
+# ── Modal Endpoint URL ─────────────────────
+
+prompt_modal_endpoint() {
+    echo ""
+    echo -e "  ${B}Modal Endpoint Configuration${R}"
+    line
+    echo -e "  ${DIM}Modal serves OpenAI-compatible APIs from your deployed apps.${R}"
+    echo -e "  ${DIM}The URL format is:${R}"
+    echo -e "  ${CYN}https://<workspace>--<app-name>-serve.modal.run${R}"
+    echo ""
+    echo -e "  ${DIM}Deploy an endpoint first with: ${B}modal deploy your_app.py${R}"
+    echo -e "  ${DIM}See examples: ${B}https://modal.com/docs/examples/vllm_inference${R}"
+    echo ""
+    read -p "  Enter your Modal endpoint URL: " MODAL_ENDPOINT
+    echo ""
+
+    if [ -z "$MODAL_ENDPOINT" ]; then
+        err "Modal endpoint URL cannot be empty!"
+        prompt_modal_endpoint
+        return
+    fi
+
+    # Strip trailing slash
+    MODAL_ENDPOINT="${MODAL_ENDPOINT%/}"
+
+    # Ensure /v1 suffix for OpenAI compatibility
+    if [[ ! "$MODAL_ENDPOINT" == */v1 ]]; then
+        MODAL_ENDPOINT="${MODAL_ENDPOINT}/v1"
+    fi
+
+    API_BASE="$MODAL_ENDPOINT"
+    ok "Modal endpoint: ${DIM}$API_BASE${R}"
+}
+
+# ── Validate Modal Endpoint ────────────────
+
+validate_modal_endpoint() {
+    info "Validating Modal endpoint..."
+    local response
+    response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $API_KEY" \
+        "${API_BASE}/models" 2>/dev/null)
+
+    if [ "$response" == "200" ]; then
+        ok "Modal endpoint is reachable!"
+        return 0
+    else
+        warn "Could not reach endpoint (HTTP $response). It may need to cold-start."
+        info "Modal containers can take a few seconds to wake up on first request."
+        return 1
+    fi
 }
 
 # ── Validate Groq API Key ──────────────────
@@ -592,7 +691,7 @@ if is_installed; then
     echo ""
     echo -e "  ${B}What do you want to do?${R}"
     echo ""
-    echo -e "  ${CYN}1)${R} Change Provider (Groq/OpenRouter)"
+    echo -e "  ${CYN}1)${R} Change Provider (Groq/OpenRouter/Modal)"
     echo -e "  ${CYN}2)${R} Change API Key"
     echo -e "  ${CYN}3)${R} Change Model"
     echo -e "  ${CYN}4)${R} Change Everything"
@@ -609,9 +708,14 @@ if is_installed; then
             echo -e "  ${B}Switch Provider${R}"
             echo -e "  ${DIM}Current: ${CURRENT_PROVIDER:-openrouter}${R}"
             select_provider
+            if [ "$PROVIDER" == "modal" ]; then
+                prompt_modal_endpoint
+            fi
             prompt_api_key
             if [ "$PROVIDER" == "groq" ]; then
                 validate_groq_key
+            elif [ "$PROVIDER" == "modal" ]; then
+                validate_modal_endpoint
             fi
             select_model
             generate_launcher "$API_KEY" "$MODEL_NAME" "$PROVIDER" "$API_BASE"
@@ -649,9 +753,14 @@ if is_installed; then
             header
             echo -e "  ${B}Update Everything${R}"
             select_provider
+            if [ "$PROVIDER" == "modal" ]; then
+                prompt_modal_endpoint
+            fi
             prompt_api_key
             if [ "$PROVIDER" == "groq" ]; then
                 validate_groq_key
+            elif [ "$PROVIDER" == "modal" ]; then
+                validate_modal_endpoint
             fi
             select_model
             generate_launcher "$API_KEY" "$MODEL_NAME" "$PROVIDER" "$API_BASE"
@@ -670,9 +779,14 @@ if is_installed; then
                 echo ""
                 echo -e "  ${B}Fresh install setup:${R}"
                 select_provider
+                if [ "$PROVIDER" == "modal" ]; then
+                    prompt_modal_endpoint
+                fi
                 prompt_api_key
                 if [ "$PROVIDER" == "groq" ]; then
                     validate_groq_key
+                elif [ "$PROVIDER" == "modal" ]; then
+                    validate_modal_endpoint
                 fi
                 select_model
                 echo ""
@@ -704,12 +818,17 @@ if is_installed; then
 else
 
     echo -e "  Welcome! Setting up Xpllc-Code with Phone Control."
-    echo -e "  ${DIM}Groq + OpenRouter Multi-Provider | Termux:API for WiFi, camera, SMS & more.${R}"
+    echo -e "  ${DIM}Groq + OpenRouter + Modal Multi-Provider | Termux:API for WiFi, camera, SMS & more.${R}"
     line
     select_provider
+    if [ "$PROVIDER" == "modal" ]; then
+        prompt_modal_endpoint
+    fi
     prompt_api_key
     if [ "$PROVIDER" == "groq" ]; then
         validate_groq_key
+    elif [ "$PROVIDER" == "modal" ]; then
+        validate_modal_endpoint
     fi
     select_model
     echo ""
